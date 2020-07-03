@@ -6,17 +6,17 @@ using System.Collections;
 namespace LSL {
     /// <summary>
     /// C# API for the lab streaming layer.
-    /// 
-    /// The lab streaming layer provides a set of functions to make instrument data accessible 
-    /// in real time within a lab network. From there, streams can be picked up by recording programs, 
+    ///
+    /// The lab streaming layer provides a set of functions to make instrument data accessible
+    /// in real time within a lab network. From there, streams can be picked up by recording programs,
     /// viewing programs or custom experiment applications that access data streams in real time.
-    /// 
+    ///
     /// The API covers two areas:
-    /// - The "push API" allows to create stream outlets and to push data (regular or irregular measurement 
+    /// - The "push API" allows to create stream outlets and to push data (regular or irregular measurement
     ///   time series, event data, coded audio/video frames, etc.) into them.
-    /// - The "pull API" allows to create stream inlets and read time-synched experiment data from them 
+    /// - The "pull API" allows to create stream inlets and read time-synched experiment data from them
     ///   (for recording, viewing or experiment control).
-    /// 
+    ///
     /// </summary>
 
 public class liblsl
@@ -30,7 +30,7 @@ public class liblsl
     /**
     * Constant to indicate that a sample has the next successive time stamp.
     * This is an optional optimization to transmit less data per sample.
-    * The stamp is then deduced from the preceding one according to the stream's sampling rate 
+    * The stamp is then deduced from the preceding one according to the stream's sampling rate
     * (in the case of an irregular rate, the same time stamp as before will is assumed).
     */
     public const double DEDUCED_TIMESTAMP = -1.0;
@@ -47,19 +47,19 @@ public class liblsl
     */
     public enum channel_format_t : byte
     {
-        cf_float32 = 1,     // For up to 24-bit precision measurements in the appropriate physical unit 
+        cf_float32 = 1,     // For up to 24-bit precision measurements in the appropriate physical unit
         // (e.g., microvolts). Integers from -16777216 to 16777216 are represented accurately.
-        cf_double64 = 2,    // For universal numeric data as long as permitted by network & disk budget. 
+        cf_double64 = 2,    // For universal numeric data as long as permitted by network & disk budget.
         // The largest representable integer is 53-bit.
         cf_string = 3,      // For variable-length ASCII strings or data blobs, such as video frames,
         // complex event descriptions, etc.
-        cf_int32 = 4,       // For high-rate digitized formats that require 32-bit precision. Depends critically on 
+        cf_int32 = 4,       // For high-rate digitized formats that require 32-bit precision. Depends critically on
         // meta-data to represent meaningful units. Useful for application event codes or other coded data.
-        cf_int16 = 5,       // For very high rate signals (40Khz+) or consumer-grade audio 
+        cf_int16 = 5,       // For very high rate signals (40Khz+) or consumer-grade audio
         // (for professional audio float is recommended).
-        cf_int8 = 6,        // For binary signals or other coded data. 
+        cf_int8 = 6,        // For binary signals or other coded data.
         // Not recommended for encoding string data.
-        cf_int64 = 7,       // For now only for future compatibility. Support for this type is not yet exposed in all languages. 
+        cf_int64 = 7,       // For now only for future compatibility. Support for this type is not yet exposed in all languages.
         // Also, some builds of liblsl will not be able to send or receive data of this type.
         cf_undefined = 0    // Can not be transmitted.
     };
@@ -71,7 +71,7 @@ public class liblsl
     {
         proc_none = 0,              // No automatic post-processing; return the ground-truth time stamps for manual
                                     // post-processing. This is the default behavior of the inlet.
-            
+
         proc_clocksync = 1,         // Perform automatic clock synchronization; equivalent to manually adding
                                     // the time_correction() value to the received time stamps.
 
@@ -93,7 +93,7 @@ public class liblsl
     * Protocol version.
     * The major version is protocol_version() / 100;
     * The minor version is protocol_version() % 100;
-    * Clients with different minor versions are protocol-compatible with each other 
+    * Clients with different minor versions are protocol-compatible with each other
     * while clients with different major versions will refuse to work together.
     */
     public static int protocol_version() { return dll.lsl_protocol_version(); }
@@ -107,9 +107,9 @@ public class liblsl
 
     /**
     * Obtain a local system time stamp in seconds. The resolution is better than a millisecond.
-    * This reading can be used to assign time stamps to samples as they are being acquired. 
-    * If the "age" of a sample is known at a particular time (e.g., from USB transmission 
-    * delays), it can be used as an offset to local_clock() to obtain a better estimate of 
+    * This reading can be used to assign time stamps to samples as they are being acquired.
+    * If the "age" of a sample is known at a particular time (e.g., from USB transmission
+    * delays), it can be used as an offset to local_clock() to obtain a better estimate of
     * when a sample was actually captured. See stream_outlet::push_sample() for a use case.
     */
     public static double local_clock() { return dll.lsl_local_clock(); }
@@ -128,7 +128,7 @@ public class liblsl
     *  b) core information (stream name, content type, sampling rate)
     *  c) optional meta-data about the stream content (channel labels, measurement units, etc.)
     *
-    * Whenever a program wants to provide a new stream on the lab network it will typically first 
+    * Whenever a program wants to provide a new stream on the lab network it will typically first
     * create a stream_info to describe its properties and then construct a stream_outlet with it to create
     * the stream on the network. Recipients who discover the outlet can query the stream_info; it is also
     * written to disk when recording the stream (playing a similar role as a file header).
@@ -139,17 +139,17 @@ public class liblsl
         /**
         * Construct a new StreamInfo object.
         * Core stream information is specified here. Any remaining meta-data can be added later.
-        * @param name Name of the stream. Describes the device (or product series) that this stream makes available 
+        * @param name Name of the stream. Describes the device (or product series) that this stream makes available
         *             (for use by programs, experimenters or data analysts). Cannot be empty.
         * @param type Content type of the stream. Please see https://github.com/sccn/xdf/wiki/Meta-Data (or web search for:
         *             XDF meta-data) for pre-defined content-type names, but you can also make up your own.
         *             The content type is the preferred way to find streams (as opposed to searching by name).
         * @param channel_count Number of channels per sample. This stays constant for the lifetime of the stream.
         * @param nominal_srate The sampling rate (in Hz) as advertised by the data source, if regular (otherwise set to IRREGULAR_RATE).
-        * @param channel_format Format/type of each channel. If your channels have different formats, consider supplying 
+        * @param channel_format Format/type of each channel. If your channels have different formats, consider supplying
         *                       multiple streams or use the largest type that can hold them all (such as cf_double64).
-        * @param source_id Unique identifier of the device or source of the data, if available (such as the serial number). 
-        *                  This is critical for system robustness since it allows recipients to recover from failure even after the 
+        * @param source_id Unique identifier of the device or source of the data, if available (such as the serial number).
+        *                  This is critical for system robustness since it allows recipients to recover from failure even after the
         *                  serving app, device or computer crashes (just by finding a stream with the same source id on the network again).
         *                  Therefore, it is highly recommended to always try to provide whatever information can uniquely identify the data source itself.
         */
@@ -166,7 +166,7 @@ public class liblsl
 
         /**
         * Name of the stream.
-        * This is a human-readable name. For streams offered by device modules, it refers to the type of device or product series 
+        * This is a human-readable name. For streams offered by device modules, it refers to the type of device or product series
         * that is generating the data of the stream. If the source is an application, the name may be a more generic or specific identifier.
         * Multiple streams with the same name can coexist, though potentially at the cost of ambiguity (for the recording app or experimenter).
         */
@@ -175,13 +175,13 @@ public class liblsl
 
         /**
         * Content type of the stream.
-        * The content type is a short string such as "EEG", "Gaze" which describes the content carried by the channel (if known). 
+        * The content type is a short string such as "EEG", "Gaze" which describes the content carried by the channel (if known).
         * If a stream contains mixed content this value need not be assigned but may instead be stored in the description of channel types.
-        * To be useful to applications and automated processing systems using the recommended content types is preferred. 
+        * To be useful to applications and automated processing systems using the recommended content types is preferred.
         * Content types usually follow those pre-defined in https://github.com/sccn/xdf/wiki/Meta-Data (or web search for: XDF meta-data).
         */
         public string type() { return Marshal.PtrToStringAnsi(dll.lsl_get_type(obj)); }
-        
+
         /**
         * Number of channels of the stream.
         * A stream has at least one channel; the channel count stays constant for all samples.
@@ -192,16 +192,16 @@ public class liblsl
         * Sampling rate of the stream, according to the source (in Hz).
         * If a stream is irregularly sampled, this should be set to IRREGULAR_RATE.
         *
-        * Note that no data will be lost even if this sampling rate is incorrect or if a device has temporary 
-        * hiccups, since all samples will be recorded anyway (except for those dropped by the device itself). However, 
-        * when the recording is imported into an application, a good importer may correct such errors more accurately 
+        * Note that no data will be lost even if this sampling rate is incorrect or if a device has temporary
+        * hiccups, since all samples will be recorded anyway (except for those dropped by the device itself). However,
+        * when the recording is imported into an application, a good importer may correct such errors more accurately
         * if the advertised sampling rate was close to the specs of the device.
         */
         public double nominal_srate() { return dll.lsl_get_nominal_srate(obj); }
 
         /**
         * Channel format of the stream.
-        * All channels in a stream have the same format. However, a device might offer multiple time-synched streams 
+        * All channels in a stream have the same format. However, a device might offer multiple time-synched streams
         * each with its own format.
         */
         public channel_format_t channel_format() { return dll.lsl_get_channel_format(obj); }
@@ -241,8 +241,8 @@ public class liblsl
         /**
         * Session ID for the given stream.
         * The session id is an optional human-assigned identifier of the recording session.
-        * While it is rarely used, it can be used to prevent concurrent recording activitites 
-        * on the same sub-network (e.g., in multiple experiment areas) from seeing each other's streams 
+        * While it is rarely used, it can be used to prevent concurrent recording activitites
+        * on the same sub-network (e.g., in multiple experiment areas) from seeing each other's streams
         * (assigned via a configuration file by the experimenter, see Network Connectivity in the LSL wiki).
         */
         public string session_id() { return Marshal.PtrToStringAnsi(dll.lsl_get_session_id(obj)); }
@@ -259,13 +259,13 @@ public class liblsl
 
         /**
         * Extended description of the stream.
-        * It is highly recommended that at least the channel labels are described here. 
-        * See code examples on the LSL wiki. Other information, such as amplifier settings, 
-        * measurement units if deviating from defaults, setup information, subject information, etc., 
+        * It is highly recommended that at least the channel labels are described here.
+        * See code examples on the LSL wiki. Other information, such as amplifier settings,
+        * measurement units if deviating from defaults, setup information, subject information, etc.,
         * can be specified here, as well. Meta-data recommendations follow the XDF file format project
         * (github.com/sccn/xdf/wiki/Meta-Data or web search for: XDF meta-data).
         *
-        * Important: if you use a stream content type for which meta-data recommendations exist, please 
+        * Important: if you use a stream content type for which meta-data recommendations exist, please
         * try to lay out your meta-data in agreement with these recommendations for compatibility with other applications.
         */
         public XMLElement desc() { return new XMLElement(dll.lsl_get_desc(obj)); }
@@ -309,10 +309,10 @@ public class liblsl
         /**
         * Establish a new stream outlet. This makes the stream discoverable.
         * @param info The stream information to use for creating this stream. Stays constant over the lifetime of the outlet.
-        * @param chunk_size Optionally the desired chunk granularity (in samples) for transmission. If unspecified, 
+        * @param chunk_size Optionally the desired chunk granularity (in samples) for transmission. If unspecified,
         *                   each push operation yields one chunk. Inlets can override this setting.
-        * @param max_buffered Optionally the maximum amount of data to buffer (in seconds if there is a nominal 
-        *                     sampling rate, otherwise x100 in samples). The default is 6 minutes of data. 
+        * @param max_buffered Optionally the maximum amount of data to buffer (in seconds if there is a nominal
+        *                     sampling rate, otherwise x100 in samples). The default is 6 minutes of data.
         */
         public StreamOutlet(StreamInfo info, int chunk_size = 0, int max_buffered = 360) { obj = dll.lsl_create_outlet(info.handle(), chunk_size, max_buffered); }
 
@@ -328,7 +328,7 @@ public class liblsl
         // ========================================
 
         /**
-        * Push an array of values as a sample into the outlet. 
+        * Push an array of values as a sample into the outlet.
         * Each entry in the vector corresponds to one channel.
         * @param data An array of values to push (one for each channel).
         * @param timestamp Optionally the capture time of the sample, in agreement with local_clock(); if omitted, the current time is used.
@@ -396,7 +396,7 @@ public class liblsl
         /**
         * Retrieve the stream info provided by this outlet.
         * This is what was used to create the stream (and also has the Additional Network Information fields assigned).
-        */ 
+        */
         public StreamInfo info() { return new StreamInfo(dll.lsl_get_info(obj)); }
 
         private IntPtr obj;
@@ -410,15 +410,15 @@ public class liblsl
     /**
     * Resolve all streams on the network.
     * This function returns all currently available streams from any outlet on the network.
-    * The network is usually the subnet specified at the local router, but may also include 
+    * The network is usually the subnet specified at the local router, but may also include
     * a multicast group of machines (given that the network supports it), or list of hostnames.
-    * These details may optionally be customized by the experimenter in a configuration file 
+    * These details may optionally be customized by the experimenter in a configuration file
     * (see Network Connectivity in the LSL wiki).
     * This is the default mechanism used by the browsing programs and the recording program.
     * @param wait_time The waiting time for the operation, in seconds, to search for streams.
-    *                  Warning: If this is too short (less than 0.5s) only a subset (or none) of the 
+    *                  Warning: If this is too short (less than 0.5s) only a subset (or none) of the
     *                           outlets that are present on the network may be returned.
-    * @return An array of stream info objects (excluding their desc field), any of which can 
+    * @return An array of stream info objects (excluding their desc field), any of which can
     *         subsequently be used to open an inlet. The full info can be retrieve from the inlet.
     */
     public static StreamInfo[] resolve_streams(double wait_time = 1.0)
@@ -438,7 +438,7 @@ public class liblsl
     * @param minimum Optionally return at least this number of streams.
     * @param timeout Optionally a timeout of the operation, in seconds (default: no timeout).
     *                 If the timeout expires, less than the desired number of streams (possibly none) will be returned.
-    * @return An array of matching stream info objects (excluding their meta-data), any of 
+    * @return An array of matching stream info objects (excluding their meta-data), any of
     *         which can subsequently be used to open an inlet.
     */
     public static StreamInfo[] resolve_stream(string prop, string value, int minimum = 1, double timeout = FOREVER)
@@ -452,13 +452,13 @@ public class liblsl
 
     /**
     * Resolve all streams that match a given predicate.
-    * Advanced query that allows to impose more conditions on the retrieved streams; the given string is an XPath 1.0 
+    * Advanced query that allows to impose more conditions on the retrieved streams; the given string is an XPath 1.0
     * predicate for the <info> node (omitting the surrounding []'s), see also http://en.wikipedia.org/w/index.php?title=XPath_1.0&oldid=474981951.
     * @param pred The predicate string, e.g. "name='BioSemi'" or "type='EEG' and starts-with(name,'BioSemi') and count(info/desc/channel)=32"
     * @param minimum Return at least this number of streams.
     * @param timeout Optionally a timeout of the operation, in seconds (default: no timeout).
     *                 If the timeout expires, less than the desired number of streams (possibly none) will be returned.
-    * @return An array of matching stream info objects (excluding their meta-data), any of 
+    * @return An array of matching stream info objects (excluding their meta-data), any of
     *         which can subsequently be used to open an inlet.
     */
     public static StreamInfo[] resolve_stream(string pred, int minimum = 1, double timeout = FOREVER)
@@ -484,21 +484,21 @@ public class liblsl
 /**
         * Construct a new stream inlet from a resolved stream info.
         * @param info A resolved stream info object (as coming from one of the resolver functions).
-        *             Note: the stream_inlet may also be constructed with a fully-specified stream_info, 
-        *                   if the desired channel format and count is already known up-front, but this is 
-        *                   strongly discouraged and should only ever be done if there is no time to resolve the 
+        *             Note: the stream_inlet may also be constructed with a fully-specified stream_info,
+        *                   if the desired channel format and count is already known up-front, but this is
+        *                   strongly discouraged and should only ever be done if there is no time to resolve the
         *                   stream up-front (e.g., due to limitations in the client program).
-        * @param max_buflen Optionally the maximum amount of data to buffer (in seconds if there is a nominal 
-        *                   sampling rate, otherwise x100 in samples). Recording applications want to use a fairly 
-        *                   large buffer size here, while real-time applications would only buffer as much as 
+        * @param max_buflen Optionally the maximum amount of data to buffer (in seconds if there is a nominal
+        *                   sampling rate, otherwise x100 in samples). Recording applications want to use a fairly
+        *                   large buffer size here, while real-time applications would only buffer as much as
         *                   they need to perform their next calculation.
-        * @param max_chunklen Optionally the maximum size, in samples, at which chunks are transmitted 
+        * @param max_chunklen Optionally the maximum size, in samples, at which chunks are transmitted
         *                     (the default corresponds to the chunk sizes used by the sender).
-        *                     Recording applications can use a generous size here (leaving it to the network how 
+        *                     Recording applications can use a generous size here (leaving it to the network how
         *                     to pack things), while real-time applications may want a finer (perhaps 1-sample) granularity.
                               If left unspecified (=0), the sender determines the chunk granularity.
-        * @param recover Try to silently recover lost streams that are recoverable (=those that that have a source_id set). 
-        *                In all other cases (recover is false or the stream is not recoverable) functions may throw a 
+        * @param recover Try to silently recover lost streams that are recoverable (=those that that have a source_id set).
+        *                In all other cases (recover is false or the stream is not recoverable) functions may throw a
         *                LostException if the stream's source is lost (e.g., due to an app or computer crash).
         */
         public StreamInlet(StreamInfo info, int max_buflen = 360, int max_chunklen = 0, bool recover = true, processing_options_t postproc_flags = processing_options_t.proc_none) {
@@ -506,7 +506,7 @@ public class liblsl
                 dll.lsl_set_postprocessing(obj, postproc_flags);
             }
 
-        /** 
+        /**
         * Destructor.
         * The inlet will automatically disconnect if destroyed.
         */
@@ -522,20 +522,20 @@ public class liblsl
 
         /**
         * Subscribe to the data stream.
-        * All samples pushed in at the other end from this moment onwards will be queued and 
-        * eventually be delivered in response to pull_sample() or pull_chunk() calls. 
+        * All samples pushed in at the other end from this moment onwards will be queued and
+        * eventually be delivered in response to pull_sample() or pull_chunk() calls.
         * Pulling a sample without some preceding open_stream is permitted (the stream will then be opened implicitly).
         * @param timeout Optional timeout of the operation (default: no timeout).
         * @throws TimeoutException (if the timeout expires), or LostException (if the stream source has been lost).
         */
         public void open_stream(double timeout = FOREVER) { int ec = 0; dll.lsl_open_stream(obj, timeout, ref ec); check_error(ec); }
- 
+
         /**
         * Drop the current data stream.
-        * All samples that are still buffered or in flight will be dropped and transmission 
-        * and buffering of data for this inlet will be stopped. If an application stops being 
-        * interested in data from a source (temporarily or not) but keeps the outlet alive, 
-        * it should call close_stream() to not waste unnecessary system and network 
+        * All samples that are still buffered or in flight will be dropped and transmission
+        * and buffering of data for this inlet will be stopped. If an application stops being
+        * interested in data from a source (temporarily or not) but keeps the outlet alive,
+        * it should call close_stream() to not waste unnecessary system and network
         * resources.
         */
         public void close_stream() { dll.lsl_close_stream(obj); }
@@ -546,7 +546,7 @@ public class liblsl
         * Subsequent calls are instantaneous (and rely on periodic background updates).
         * The precision of these estimates should be below 1 ms (empirically within +/-0.2 ms).
         * @timeout Timeout to acquire the first time-correction estimate (default: no timeout).
-        * @return The time correction estimate. This is the number that needs to be added to a time stamp 
+        * @return The time correction estimate. This is the number that needs to be added to a time stamp
         *         that was remotely generated via lsl_local_clock() to map it into the local clock domain of this machine.
         * @throws TimeoutException (if the timeout expires), or LostException (if the stream source has been lost).
         */
@@ -561,8 +561,8 @@ public class liblsl
         * Handles type checking & conversion.
         * @param sample An array to hold the resulting values.
         * @param timeout The timeout for this operation, if any. Use 0.0 to make the function non-blocking.
-        * @return The capture time of the sample on the remote machine, or 0.0 if no new sample was available. 
-        *          To remap this time stamp to the local clock, add the value returned by .time_correction() to it. 
+        * @return The capture time of the sample on the remote machine, or 0.0 if no new sample was available.
+        *          To remap this time stamp to the local clock, add the value returned by .time_correction() to it.
         * @throws LostException (if the stream source has been lost).
         */
         public double pull_sample(float[] sample, double timeout = FOREVER) { int ec = 0; double res = dll.lsl_pull_sample_f(obj, sample, sample.Length, timeout, ref ec); check_error(ec); return res; }
@@ -570,7 +570,7 @@ public class liblsl
         public double pull_sample(int[] sample, double timeout = FOREVER) { int ec = 0; double res = dll.lsl_pull_sample_i(obj, sample, sample.Length, timeout, ref ec); check_error(ec); return res; }
         public double pull_sample(short[] sample, double timeout = FOREVER) { int ec = 0; double res = dll.lsl_pull_sample_s(obj, sample, sample.Length, timeout, ref ec); check_error(ec); return res; }
         public double pull_sample(char[] sample, double timeout = FOREVER) { int ec = 0; double res = dll.lsl_pull_sample_c(obj, sample, sample.Length, timeout, ref ec); check_error(ec); return res; }
-        public double pull_sample(string[] sample, double timeout = FOREVER) { 
+        public double pull_sample(string[] sample, double timeout = FOREVER) {
             int ec = 0;
             IntPtr[] tmp = new IntPtr[sample.Length];
             double res = dll.lsl_pull_sample_str(obj, tmp, tmp.Length, timeout, ref ec); check_error(ec);
@@ -592,9 +592,9 @@ public class liblsl
         /**
         * Pull a chunk of data from the inlet.
         * @param data_buffer A pre-allocated buffer where the channel data shall be stored.
-        * @param timestamp_buffer A pre-allocated buffer where time stamps shall be stored. 
-        * @param timeout Optionally the timeout for this operation, if any. When the timeout expires, the function 
-        *                may return before the entire buffer is filled. The default value of 0.0 will retrieve only 
+        * @param timestamp_buffer A pre-allocated buffer where time stamps shall be stored.
+        * @param timeout Optionally the timeout for this operation, if any. When the timeout expires, the function
+        *                may return before the entire buffer is filled. The default value of 0.0 will retrieve only
         *                data available for immediate pickup.
         * @return samples_written Number of samples written to the data and timestamp buffers.
         * @throws LostException (if the stream source has been lost).
@@ -604,7 +604,7 @@ public class liblsl
         public int pull_chunk(int[,] data_buffer, double[] timestamp_buffer, double timeout = 0.0) { int ec = 0; uint res = dll.lsl_pull_chunk_i(obj, data_buffer, timestamp_buffer, (uint)data_buffer.Length, (uint)timestamp_buffer.Length, timeout, ref ec); check_error(ec); return (int)res / data_buffer.GetLength(1); }
         public int pull_chunk(short[,] data_buffer, double[] timestamp_buffer, double timeout = 0.0) { int ec = 0; uint res = dll.lsl_pull_chunk_s(obj, data_buffer, timestamp_buffer, (uint)data_buffer.Length, (uint)timestamp_buffer.Length, timeout, ref ec); check_error(ec); return (int)res / data_buffer.GetLength(1); }
         public int pull_chunk(char[,] data_buffer, double[] timestamp_buffer, double timeout = 0.0) { int ec = 0; uint res = dll.lsl_pull_chunk_c(obj, data_buffer, timestamp_buffer, (uint)data_buffer.Length, (uint)timestamp_buffer.Length, timeout, ref ec); check_error(ec); return (int)res / data_buffer.GetLength(1); }
-        public int pull_chunk(string[,] data_buffer, double[] timestamp_buffer, double timeout = 0.0) { 
+        public int pull_chunk(string[,] data_buffer, double[] timestamp_buffer, double timeout = 0.0) {
             int ec = 0;
             IntPtr[,] tmp = new IntPtr[data_buffer.GetLength(0),data_buffer.GetLength(1)];
             uint res = dll.lsl_pull_chunk_str(obj, tmp, timestamp_buffer, (uint)tmp.Length, (uint)timestamp_buffer.Length, timeout, ref ec);
@@ -623,17 +623,17 @@ public class liblsl
 
         /**
         * Query whether samples are currently available for immediate pickup.
-        * Note that it is not a good idea to use samples_available() to determine whether 
+        * Note that it is not a good idea to use samples_available() to determine whether
         * a pull_*() call would block: to be sure, set the pull timeout to 0.0 or an acceptably
-        * low value. If the underlying implementation supports it, the value will be the number of 
+        * low value. If the underlying implementation supports it, the value will be the number of
         * samples available (otherwise it will be 1 or 0).
         */
         public int samples_available() { return (int)dll.lsl_samples_available(obj); }
 
         /**
         * Query whether the clock was potentially reset since the last call to was_clock_reset().
-        * This is a rarely-used function that is only useful to applications that combine multiple time_correction 
-        * values to estimate precise clock drift; it allows to tolerate cases where the source machine was 
+        * This is a rarely-used function that is only useful to applications that combine multiple time_correction
+        * values to estimate precise clock drift; it allows to tolerate cases where the source machine was
         * hot-swapped or restarted in between two measurements.
         */
         public bool was_clock_reset() { return (int)dll.lsl_was_clock_reset(obj)!=0; }
@@ -761,16 +761,16 @@ public class liblsl
     // === Continuous Resolver ===
     // ===========================
 
-    /** 
-    * A convenience class that resolves streams continuously in the background throughout 
-    * its lifetime and which can be queried at any time for the set of streams that are currently 
+    /**
+    * A convenience class that resolves streams continuously in the background throughout
+    * its lifetime and which can be queried at any time for the set of streams that are currently
     * visible on the network.
     */
 
     public class ContinuousResolver
     {
         /**
-        * Construct a new continuous_resolver that resolves all streams on the network. 
+        * Construct a new continuous_resolver that resolves all streams on the network.
         * This is analogous to the functionality offered by the free function resolve_streams().
         * @param forget_after When a stream is no longer visible on the network (e.g., because it was shut down),
         *                     this is the time in seconds after which it is no longer reported by the resolver.
@@ -799,19 +799,19 @@ public class liblsl
         public ContinuousResolver(string pred) { obj = dll.lsl_create_continuous_resolver_bypred(pred, 5.0); }
         public ContinuousResolver(string pred, double forget_after) { obj = dll.lsl_create_continuous_resolver_bypred(pred, forget_after); }
 
-        /** 
+        /**
         * Destructor.
         */
         ~ContinuousResolver() { dll.lsl_destroy_continuous_resolver(obj); }
 
         /**
         * Obtain the set of currently present streams on the network (i.e. resolve result).
-        * @return An array of matching stream info objects (excluding their meta-data), any of 
+        * @return An array of matching stream info objects (excluding their meta-data), any of
         *         which can subsequently be used to open an inlet.
         */
         public StreamInfo[] results()
         {
-            IntPtr[] buf = new IntPtr[1024]; 
+            IntPtr[] buf = new IntPtr[1024];
             int num = dll.lsl_resolver_results(obj,buf,(uint)buf.Length);
             StreamInfo[] res = new StreamInfo[num];
             for (int k = 0; k < num; k++)
@@ -887,7 +887,7 @@ public class liblsl
 #elif UNITY_EDITOR_WIN
             const string libname = "liblsl32";
 #elif UNITY_STANDALONE_WIN
-            // a build hook will took care that the correct dll will be renamed after a successfull build 
+            // a build hook will took care that the correct dll will be renamed after a successfull build
             const string libname =  "liblsl";
 #elif UNITY_ANDROID
             const string libname = "lslAndroid";
@@ -895,7 +895,7 @@ public class liblsl
             // Name of the binary to include -- replace this if on non-Windows and non-Unity (e.g., liblsl64.so)
             const string libname = "liblsl32.dll";
 #endif
-            
+
         [DllImport(libname, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
         public static extern int lsl_protocol_version();
 
@@ -952,7 +952,7 @@ public class liblsl
 
         [DllImport(libname, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
         public static extern IntPtr lsl_create_outlet(IntPtr info, int chunk_size, int max_buffered);
- 
+
         [DllImport(libname, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
         public static extern void lsl_destroy_outlet(IntPtr obj);
 
@@ -961,19 +961,19 @@ public class liblsl
 
         [DllImport(libname, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
         public static extern int lsl_push_sample_dtp(IntPtr obj, double[] data, double timestamp, int pushthrough);
-        
+
         [DllImport(libname, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
         public static extern int lsl_push_sample_itp(IntPtr obj, int[] data, double timestamp, int pushthrough);
-        
+
         [DllImport(libname, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
         public static extern int lsl_push_sample_stp(IntPtr obj, short[] data, double timestamp, int pushthrough);
-        
+
         [DllImport(libname, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
         public static extern int lsl_push_sample_ctp(IntPtr obj, char[] data, double timestamp, int pushthrough);
-        
+
         [DllImport(libname, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
         public static extern int lsl_push_sample_strtp(IntPtr obj, string[] data, double timestamp, int pushthrough);
-        
+
         [DllImport(libname, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
         public static extern int lsl_push_sample_buftp(IntPtr obj, char[][] data, uint[] lengths, double timestamp, int pushthrough);
 
@@ -985,37 +985,37 @@ public class liblsl
 
         [DllImport(libname, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
         public static extern int lsl_push_chunk_dtp(IntPtr obj, double[,] data, uint data_elements, double timestamp, int pushthrough);
-        
+
         [DllImport(libname, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
         public static extern int lsl_push_chunk_dtnp(IntPtr obj, double[,] data, uint data_elements, double[] timestamps, int pushthrough);
-        
+
         [DllImport(libname, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
         public static extern int lsl_push_chunk_itp(IntPtr obj, int[,] data, uint data_elements, double timestamp, int pushthrough);
-        
+
         [DllImport(libname, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
         public static extern int lsl_push_chunk_itnp(IntPtr obj, int[,] data, uint data_elements, double[] timestamps, int pushthrough);
-        
+
         [DllImport(libname, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
         public static extern int lsl_push_chunk_stp(IntPtr obj, short[,] data, uint data_elements, double timestamp, int pushthrough);
-        
+
         [DllImport(libname, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
         public static extern int lsl_push_chunk_stnp(IntPtr obj, short[,] data, uint data_elements, double[] timestamps, int pushthrough);
-        
+
         [DllImport(libname, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
         public static extern int lsl_push_chunk_ctp(IntPtr obj, char[,] data, uint data_elements, double timestamp, int pushthrough);
-        
+
         [DllImport(libname, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
         public static extern int lsl_push_chunk_ctnp(IntPtr obj, char[,] data, uint data_elements, double[] timestamps, int pushthrough);
-        
+
         [DllImport(libname, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
         public static extern int lsl_push_chunk_strtp(IntPtr obj, string[,] data, uint data_elements, double timestamp, int pushthrough);
-        
+
         [DllImport(libname, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
         public static extern int lsl_push_chunk_strtnp(IntPtr obj, string[,] data, uint data_elements, double[] timestamps, int pushthrough);
-        
+
         [DllImport(libname, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
         public static extern int lsl_push_chunk_buftp(IntPtr obj, char[][] data, uint[] lengths, uint data_elements, double timestamp, int pushthrough);
-        
+
         [DllImport(libname, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
         public static extern int lsl_push_chunk_buftnp(IntPtr obj, char[][] data, uint[] lengths, uint data_elements, double[] timestamps, int pushthrough);
 
@@ -1109,7 +1109,7 @@ public class liblsl
         [DllImport(libname, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
         public static extern uint lsl_was_clock_reset(IntPtr obj);
 
-        [DllImport(libname, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]        
+        [DllImport(libname, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
         public static extern IntPtr lsl_first_child(IntPtr e);
 
         [DllImport(libname, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
